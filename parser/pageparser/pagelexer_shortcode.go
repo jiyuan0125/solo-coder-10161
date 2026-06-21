@@ -181,7 +181,8 @@ Loop:
 	for {
 		switch r := l.next(); {
 		case r == '\\':
-			if l.peek() == '"' {
+			next := l.peek()
+			if next == '"' {
 				if openQuoteFound && !escapedQuotedValuesAllowed {
 					l.backup()
 					break Loop
@@ -190,10 +191,16 @@ Loop:
 					escapedInnerQuoteFound = true
 					escapedQuoteState = 1
 				}
-			} else if l.peek() == '`' {
+			} else if next == '`' {
 				return l.errorf("unrecognized escape character")
+			} else if next == '\n' || next == '\r' {
+				// Backslash before line ending is preserved, consume the line ending
+				l.next()
 			}
-		case r == eof, r == '\n':
+		case r == eof:
+			return l.errorf("unterminated quoted string in shortcode parameter-argument: '%s'", l.current())
+		case r == '\n':
+			// Only error if not preceded by backslash (handled above)
 			return l.errorf("unterminated quoted string in shortcode parameter-argument: '%s'", l.current())
 		case r == '"':
 			if escapedQuoteState == 0 {

@@ -44,7 +44,14 @@ func ParseBytes(b []byte, cfg Config) (Items, error) {
 	if err != nil {
 		return nil, err
 	}
-	return l.items, l.err
+	// Check for error in items
+	if len(l.items) > 0 {
+		lastItem := l.items[len(l.items)-1]
+		if lastItem.Type == tError && lastItem.Err != nil {
+			return l.items, lastItem.Err
+		}
+	}
+	return l.items, nil
 }
 
 type ContentFrontMatter struct {
@@ -64,31 +71,64 @@ func ParseFrontMatterAndContent(r io.Reader) (ContentFrontMatter, error) {
 	}
 
 	psr, err := ParseBytes(input, Config{})
-	if err != nil {
-		return cf, err
-	}
+	// Continue even if there's a lexer error - we might still be able to
+	// treat the input as content without front matter.
+	// Only return the error if we actually found a front matter that failed.
 
 	var frontMatterSource []byte
+	var contentStartPos int = -1
 
 	iter := NewIterator(psr)
 
 	walkFn := func(item Item) bool {
 		if frontMatterSource != nil {
 			// The rest is content.
-			cf.Content = input[item.low:]
+			contentStartPos = item.low
 			// Done
 			return false
 		} else if item.IsFrontMatter() {
 			cf.FrontMatterFormat = FormatFromFrontMatterType(item.Type)
 			frontMatterSource = item.Val(input)
+		} else if item.Type == tError {
+			// Propagate lexer errors (e.g., unclosed front matter)
+			return false
 		}
 		return true
 	}
 
 	iter.PeekWalk(walkFn)
 
+	// Handle errors: only return error if we found a front matter before the error
+	if err != nil {
+		if frontMatterSource != nil {
+			return cf, err
+		}
+		// No valid front matter found, entire input is content
+		cf.Content = input
+		return cf, nil
+	}
+
+	// If no front matter was found, the entire input is content
+	if frontMatterSource == nil {
+		cf.Content = input
+	} else if contentStartPos >= 0 && contentStartPos <= len(input) {
+		cf.Content = input[contentStartPos:]
+	}
+
 	cf.FrontMatter, err = metadecoders.Default.UnmarshalToMap(frontMatterSource, cf.FrontMatterFormat)
-	return cf, err
+	if err != nil {
+		// If front matter parsing fails and we didn't find a clear content boundary,
+		// treat the entire input as content (no valid front matter).
+		// This handles cases like "{ not valid JSON }" that look like JSON but aren't.
+		if contentStartPos < 0 {
+			cf.Content = input
+			cf.FrontMatter = nil
+			cf.FrontMatterFormat = ""
+			return cf, nil
+		}
+		return cf, err
+	}
+	return cf, nil
 }
 
 func FormatFromFrontMatterType(typ ItemType) metadecoders.Format {

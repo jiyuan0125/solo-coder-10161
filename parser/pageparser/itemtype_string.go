@@ -11,32 +11,34 @@ func _() {
 	_ = x[tError-0]
 	_ = x[tEOF-1]
 	_ = x[TypeLeadSummaryDivider-2]
-	_ = x[TypeFrontMatterYAML-3]
-	_ = x[TypeFrontMatterTOML-4]
-	_ = x[TypeFrontMatterJSON-5]
-	_ = x[TypeFrontMatterORG-6]
-	_ = x[TypeIgnore-7]
-	_ = x[tLeftDelimScNoMarkup-8]
-	_ = x[tRightDelimScNoMarkup-9]
-	_ = x[tLeftDelimScWithMarkup-10]
-	_ = x[tRightDelimScWithMarkup-11]
-	_ = x[tScClose-12]
-	_ = x[tScName-13]
-	_ = x[tScNameInline-14]
-	_ = x[tScParam-15]
-	_ = x[tScParamVal-16]
-	_ = x[tIndentation-17]
-	_ = x[tText-18]
-	_ = x[tKeywordMarker-19]
+	_ = x[TypeSummaryDivider-3]
+	_ = x[TypeFrontMatterYAML-4]
+	_ = x[TypeFrontMatterTOML-5]
+	_ = x[TypeFrontMatterJSON-6]
+	_ = x[TypeFrontMatterORG-7]
+	_ = x[TypeIgnore-8]
+	_ = x[tLeftDelimScNoMarkup-9]
+	_ = x[tRightDelimScNoMarkup-10]
+	_ = x[tLeftDelimScWithMarkup-11]
+	_ = x[tRightDelimScWithMarkup-12]
+	_ = x[tScClose-13]
+	_ = x[tScName-14]
+	_ = x[tScNameInline-15]
+	_ = x[tScParam-16]
+	_ = x[tScParamVal-17]
+	_ = x[tIndentation-18]
+	_ = x[tText-19]
+	_ = x[tKeywordMarker-20]
 }
 
-const _ItemType_name = "tErrortEOFTypeLeadSummaryDividerTypeFrontMatterYAMLTypeFrontMatterTOMLTypeFrontMatterJSONTypeFrontMatterORGTypeIgnoretLeftDelimScNoMarkuptRightDelimScNoMarkuptLeftDelimScWithMarkuptRightDelimScWithMarkuptScClosetScNametScNameInlinetScParamtScParamValtIndentationtTexttKeywordMarker"
+const _ItemType_name = "tErrortEOFTypeLeadSummaryDividerTypeSummaryDividerTypeFrontMatterYAMLTypeFrontMatterTOMLTypeFrontMatterJSONTypeFrontMatterORGTypeIgnoretLeftDelimScNoMarkuptRightDelimScNoMarkuptLeftDelimScWithMarkuptRightDelimScWithMarkuptScClosetScNametScNameInlinetScParamtScParamValtIndentationtTexttKeywordMarker"
 
-var _ItemType_index = [...]uint16{0, 6, 10, 32, 51, 70, 89, 107, 117, 137, 158, 180, 203, 211, 218, 231, 239, 250, 262, 267, 281}
+var _ItemType_index = [...]uint16{0, 6, 10, 32, 50, 69, 88, 107, 125, 135, 155, 176, 198, 221, 229, 236, 249, 257, 268, 280, 285, 299}
 
 func (i ItemType) String() string {
-	if i < 0 || i >= ItemType(len(_ItemType_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_ItemType_index)-1 {
 		return "ItemType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ItemType_name[_ItemType_index[i]:_ItemType_index[i+1]]
+	return _ItemType_name[_ItemType_index[idx]:_ItemType_index[idx+1]]
 }

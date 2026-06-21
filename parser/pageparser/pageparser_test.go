@@ -138,3 +138,298 @@ func TestSummaryDividerStartingFromMain(t *testing.T) {
 	c.Assert(items, qt.HasLen, 4)
 	c.Assert(items[1].Type, qt.Equals, TypeLeadSummaryDivider)
 }
+
+func TestMultipleSummaryDividers(t *testing.T) {
+	c := qt.New(t)
+
+	t.Run("HTML comment multiple dividers", func(t *testing.T) {
+		input := `---
+title: "Test"
+---
+First section.
+<!--more-->
+Second section.
+<!--more-->
+Third section.`
+		items, err := collectStringIntro(input)
+		c.Assert(err, qt.IsNil)
+
+		var dividerCount int
+		var leadDividerCount int
+		for _, item := range items {
+			if item.Type == TypeLeadSummaryDivider {
+				leadDividerCount++
+			} else if item.Type == TypeSummaryDivider {
+				dividerCount++
+			}
+		}
+		c.Assert(leadDividerCount, qt.Equals, 1)
+		c.Assert(dividerCount, qt.Equals, 1)
+	})
+
+	t.Run("Org mode multiple dividers", func(t *testing.T) {
+		input := `#+title: Test
+First section.
+# more
+Second section.
+# more
+Third section.`
+		items, err := collectStringIntro(input)
+		c.Assert(err, qt.IsNil)
+
+		var dividerCount int
+		var leadDividerCount int
+		for _, item := range items {
+			if item.Type == TypeLeadSummaryDivider {
+				leadDividerCount++
+			} else if item.Type == TypeSummaryDivider {
+				dividerCount++
+			}
+		}
+		c.Assert(leadDividerCount, qt.Equals, 1)
+		c.Assert(dividerCount, qt.Equals, 1)
+	})
+
+	t.Run("Single divider backward compatible", func(t *testing.T) {
+		input := `---
+title: "Test"
+---
+First section.
+<!--more-->
+Second section.`
+		items, err := collectStringIntro(input)
+		c.Assert(err, qt.IsNil)
+
+		var leadDividerCount int
+		var otherDividerCount int
+		for _, item := range items {
+			if item.Type == TypeLeadSummaryDivider {
+				leadDividerCount++
+			} else if item.Type == TypeSummaryDivider {
+				otherDividerCount++
+			}
+		}
+		c.Assert(leadDividerCount, qt.Equals, 1)
+		c.Assert(otherDividerCount, qt.Equals, 0)
+	})
+
+	t.Run("Mixed dividers with YAML front matter", func(t *testing.T) {
+		input := `---
+title: "Test"
+---
+First section.
+<!--more-->
+Second section.
+# more
+Third section.`
+		items, err := collectStringIntro(input)
+		c.Assert(err, qt.IsNil)
+
+		var htmlDividers int
+		var orgDividers int
+		for _, item := range items {
+			if item.Type == TypeLeadSummaryDivider || item.Type == TypeSummaryDivider {
+				val := string(item.Val([]byte(input)))
+				if strings.Contains(val, "<!--more-->") {
+					htmlDividers++
+				} else if strings.Contains(val, "# more") {
+					orgDividers++
+				}
+			}
+		}
+		c.Assert(htmlDividers, qt.Equals, 1)
+		c.Assert(orgDividers, qt.Equals, 0)
+	})
+}
+
+func TestNoFrontMatterStability(t *testing.T) {
+	c := qt.New(t)
+
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"Empty file", ""},
+		{"Pure whitespace", "   \n\n  \t  "},
+		{"BOM only", "\xef\xbb\xbf"},
+		{"BOM with whitespace", "\xef\xbb\xbf   \n  "},
+		{"Hash start no front matter", "# This is a heading"},
+		{"Plus start no front matter", "+ just some text"},
+		{"Brace start unclosed JSON", "{ not closed JSON"},
+		{"No front matter just content", "Just some markdown content\n\nWith multiple lines.\n\n* List item"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cf, err := ParseFrontMatterAndContent(strings.NewReader(tc.input))
+			c.Assert(err, qt.IsNil)
+			c.Assert(string(cf.Content), qt.Equals, tc.input)
+		})
+	}
+}
+
+func TestOrgFrontMatterDetection(t *testing.T) {
+	c := qt.New(t)
+
+	t.Run("Org format with colon in value", func(t *testing.T) {
+		input := `#+title: Test: With Colons
+#+custom: key=value:another=thing
+#+date: 2024-01-01
+
+Content here.`
+		items, err := collectStringIntro(input)
+		c.Assert(err, qt.IsNil)
+
+		var foundOrgFM bool
+		for _, item := range items {
+			if item.Type == TypeFrontMatterORG {
+				foundOrgFM = true
+				val := string(item.Val([]byte(input)))
+				c.Assert(strings.Contains(val, "#+title:"), qt.IsTrue)
+				c.Assert(strings.Contains(val, "key=value:another=thing"), qt.IsTrue)
+			}
+		}
+		c.Assert(foundOrgFM, qt.IsTrue)
+	})
+
+	t.Run("Org format with equals in value", func(t *testing.T) {
+		var d metadecoders.Decoder
+		format := d.FormatFromContentString(`#+title: Test
+#+options: toc:t author:t num:nil
+#+custom: a=1 b=2 c=3`)
+		c.Assert(format, qt.Equals, metadecoders.ORG)
+	})
+
+	t.Run("YAML not confused with Org", func(t *testing.T) {
+		var d metadecoders.Decoder
+		format := d.FormatFromContentString(`---
+title: "Test"
+---`)
+		c.Assert(format, qt.Not(qt.Equals), metadecoders.ORG)
+	})
+
+	t.Run("JSON not confused with Org", func(t *testing.T) {
+		var d metadecoders.Decoder
+		format := d.FormatFromContentString(`{
+  "title": "Test"
+}`)
+		c.Assert(format, qt.Not(qt.Equals), metadecoders.ORG)
+	})
+}
+
+func TestShortcodeEscapePreservation(t *testing.T) {
+	c := qt.New(t)
+
+	t.Run("Backslash before asterisk preserved", func(t *testing.T) {
+		input := `{{< sc param="Hello \* World" >}}`
+		items, err := collectStringMain(input)
+		c.Assert(err, qt.IsNil)
+
+		for _, item := range items {
+			if item.Type == tScParamVal {
+				val := string(item.Val([]byte(input)))
+				c.Assert(strings.Contains(val, `\*`), qt.IsTrue)
+			}
+		}
+	})
+
+	t.Run("Backslash before underscore preserved", func(t *testing.T) {
+		input := `{{< sc param="Hello \_ World" >}}`
+		items, err := collectStringMain(input)
+		c.Assert(err, qt.IsNil)
+
+		for _, item := range items {
+			if item.Type == tScParamVal {
+				val := string(item.Val([]byte(input)))
+				c.Assert(strings.Contains(val, `\_`), qt.IsTrue)
+			}
+		}
+	})
+
+	t.Run("Backslash before paren preserved", func(t *testing.T) {
+		input := `{{< sc param="Hello \( World" >}}`
+		items, err := collectStringMain(input)
+		c.Assert(err, qt.IsNil)
+
+		for _, item := range items {
+			if item.Type == tScParamVal {
+				val := string(item.Val([]byte(input)))
+				c.Assert(strings.Contains(val, `\(`), qt.IsTrue)
+			}
+		}
+	})
+
+	t.Run("Backslash before bracket preserved", func(t *testing.T) {
+		input := `{{< sc param="Hello \[ World" >}}`
+		items, err := collectStringMain(input)
+		c.Assert(err, qt.IsNil)
+
+		for _, item := range items {
+			if item.Type == tScParamVal {
+				val := string(item.Val([]byte(input)))
+				c.Assert(strings.Contains(val, `\[`), qt.IsTrue)
+			}
+		}
+	})
+
+	t.Run("Backslash before multi-byte character", func(t *testing.T) {
+		input := `{{< sc param="Hello \中文 World" >}}`
+		items, err := collectStringMain(input)
+		c.Assert(err, qt.IsNil)
+
+		for _, item := range items {
+			if item.Type == tScParamVal {
+				val := string(item.Val([]byte(input)))
+				c.Assert(strings.Contains(val, `\中文`), qt.IsTrue)
+			}
+		}
+	})
+
+	t.Run("Backslash at end of line", func(t *testing.T) {
+		input := "{{< sc param=\"Hello \\\nWorld\" >}}"
+		items, err := collectStringMain(input)
+		c.Assert(err, qt.IsNil)
+
+		for _, item := range items {
+			if item.Type == tScParamVal {
+				val := string(item.Val([]byte(input)))
+				c.Assert(strings.Contains(val, "\\\n"), qt.IsTrue)
+			}
+		}
+	})
+
+	t.Run("Backslash before backtick should error", func(t *testing.T) {
+		input := "{{< sc param=\"Hello \\` World\" >}}"
+		items, err := collectStringMain(input)
+		// The error may be returned directly or via a tError item
+		var foundError bool
+		var errorMsg string
+		if err != nil {
+			foundError = true
+			errorMsg = err.Error()
+		} else {
+			for _, item := range items {
+				if item.Type == tError && item.Err != nil {
+					foundError = true
+					errorMsg = item.Err.Error()
+					break
+				}
+			}
+		}
+		c.Assert(foundError, qt.IsTrue)
+		c.Assert(strings.Contains(errorMsg, "unrecognized escape character"), qt.IsTrue)
+	})
+
+	t.Run("Escaped quote becomes quote", func(t *testing.T) {
+		input := `{{< sc param="Hello \"World\"" >}}`
+		items, err := collectStringMain(input)
+		c.Assert(err, qt.IsNil)
+
+		for _, item := range items {
+			if item.Type == tScParamVal {
+				val := string(item.Val([]byte(input)))
+				c.Assert(val, qt.Equals, `Hello "World"`)
+			}
+		}
+	})
+}

@@ -16,6 +16,7 @@ package metadecoders
 import (
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 type Format string
@@ -67,10 +68,20 @@ func FormatFromString(formatStr string) Format {
 	return ""
 }
 
-// FormatFromContentString tries to detect the format (JSON, YAML, TOML or XML)
+// FormatFromContentString tries to detect the format (JSON, YAML, TOML, XML, ORG or CSV)
 // in the given string.
 // It return an empty string if no format could be detected.
 func (d Decoder) FormatFromContentString(data string) Format {
+	// First, check for ORG format using stable features (#+ prefix)
+	// instead of fragile character index sniffing.
+	// Skip leading whitespace and BOM for the check.
+	trimmed := strings.TrimLeftFunc(data, func(r rune) bool {
+		return unicode.IsSpace(r) || r == '\ufeff'
+	})
+	if strings.HasPrefix(trimmed, "#+") {
+		return ORG
+	}
+
 	csvIdx := strings.IndexRune(data, d.Delimiter)
 	jsonIdx := strings.Index(data, "{")
 	yamlIdx := strings.Index(data, ":")

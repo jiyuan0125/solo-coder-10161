@@ -155,6 +155,10 @@ func collectStringMain(input string) ([]Item, error) {
 	return collect([]byte(input), true, lexMainSection)
 }
 
+func collectStringIntro(input string) ([]Item, error) {
+	return collect([]byte(input), false, lexIntroSection)
+}
+
 // no positional checking, for now ...
 func equal(source string, got []Item, expect []typeText) bool {
 	if len(got) != len(expect) {

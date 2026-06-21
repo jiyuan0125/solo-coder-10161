@@ -42,8 +42,8 @@ type pageLexer struct {
 
 	// The summary divider to look for.
 	summaryDivider []byte
-	// Set when we have parsed any summary divider
-	summaryDividerChecked bool
+	// Count of summary dividers parsed so far
+	summaryDividerCount int
 
 	lexerShortcodeState
 
@@ -180,39 +180,53 @@ func (l *pageLexer) isEOF() bool {
 	return l.pos >= len(l.input)
 }
 
-// special case, do not send '\\' back to client
+// Process escape sequences in string values.
+// - \" is converted to " (legitimate string delimiter escape, skip the backslash)
+// - All other backslashes are preserved for byte-level round-trip
 func (l *pageLexer) ignoreEscapesAndEmit(t ItemType, isString bool) {
-	i := l.start
-	k := i
+	start := l.start
+	end := l.pos
+	pos := start
 
 	var segments []lowHigh
 
-	for i < l.pos {
-		r, w := utf8.DecodeRune(l.input[i:l.pos])
-		if r == '\\' {
-			if i > k {
-				segments = append(segments, lowHigh{k, i})
+	for pos < end {
+		if l.input[pos] == '\\' && pos+1 < end {
+			next := l.input[pos+1]
+			if next == '"' {
+				if pos > start {
+					segments = append(segments, lowHigh{Low: start, High: pos})
+				}
+				start = pos + 1
+				pos = pos + 2
+				continue
 			}
-			// See issue #10236.
-			// We don't send the backslash back to the client,
-			// which makes the end parsing simpler.
-			// This means that we cannot render the AST back to be
-			// exactly the same as the input,
-			// but that was also the situation before we introduced the issue in #10236.
-			k = i + w
+			pos = pos + 2
+			continue
 		}
-		i += w
+		pos++
 	}
 
-	if k < l.pos {
-		segments = append(segments, lowHigh{k, l.pos})
+	if end > start {
+		segments = append(segments, lowHigh{Low: start, High: end})
 	}
 
-	if len(segments) > 0 {
-		l.append(Item{Type: t, segments: segments})
+	item := Item{Type: t, isString: isString}
+	if len(segments) == 1 {
+		item.low = segments[0].Low
+		item.high = segments[0].High
+	} else if len(segments) > 1 {
+		item.segments = segments
+		item.low = segments[0].Low
+		item.high = segments[len(segments)-1].High
+	} else {
+		item.low = l.start
+		item.high = l.pos
 	}
 
-	l.start = l.pos
+	l.append(item)
+	l.start = end
+	l.pos = end
 }
 
 // gets the current value (for debugging and error handling)
@@ -343,9 +357,6 @@ func createSectionHandlers(l *pageLexer) *sectionHandlers {
 		summaryDividerHandler := &sectionHandler{
 			l: l,
 			skipFunc: func(l *pageLexer) int {
-				if l.summaryDividerChecked {
-					return -1
-				}
 				return l.index(l.summaryDivider)
 			},
 			lexFunc: func(origin stateFunc, l *pageLexer) (stateFunc, bool) {
@@ -353,11 +364,15 @@ func createSectionHandlers(l *pageLexer) *sectionHandlers {
 					return origin, false
 				}
 
-				l.summaryDividerChecked = true
+				l.summaryDividerCount++
 				l.pos += len(l.summaryDivider)
 				// This makes it a little easier to reason about later.
 				l.consumeSpace()
-				l.emit(TypeLeadSummaryDivider)
+				if l.summaryDividerCount == 1 {
+					l.emit(TypeLeadSummaryDivider)
+				} else {
+					l.emit(TypeSummaryDivider)
+				}
 
 				return origin, true
 			},

@@ -188,7 +188,8 @@ const (
 	tEOF
 
 	// page items
-	TypeLeadSummaryDivider // <!--more-->,  # more
+	TypeLeadSummaryDivider // <!--more-->,  # more (first occurrence)
+	TypeSummaryDivider     // <!--more-->,  # more (subsequent occurrences)
 	TypeFrontMatterYAML
 	TypeFrontMatterTOML
 	TypeFrontMatterJSON
