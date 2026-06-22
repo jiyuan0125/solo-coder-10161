@@ -42,8 +42,6 @@ type pageLexer struct {
 
 	// The summary divider to look for.
 	summaryDivider []byte
-	// Set when we have parsed any summary divider
-	summaryDividerChecked bool
 
 	lexerShortcodeState
 
@@ -343,9 +341,6 @@ func createSectionHandlers(l *pageLexer) *sectionHandlers {
 		summaryDividerHandler := &sectionHandler{
 			l: l,
 			skipFunc: func(l *pageLexer) int {
-				if l.summaryDividerChecked {
-					return -1
-				}
 				return l.index(l.summaryDivider)
 			},
 			lexFunc: func(origin stateFunc, l *pageLexer) (stateFunc, bool) {
@@ -353,9 +348,7 @@ func createSectionHandlers(l *pageLexer) *sectionHandlers {
 					return origin, false
 				}
 
-				l.summaryDividerChecked = true
 				l.pos += len(l.summaryDivider)
-				// This makes it a little easier to reason about later.
 				l.consumeSpace()
 				l.emit(TypeLeadSummaryDivider)
 

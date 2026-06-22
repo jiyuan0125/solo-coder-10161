@@ -62,6 +62,12 @@ var frontMatterTests = []lexerTest{
 	{"empty", "", []typeText{tstEOF}, nil},
 	{"Byte order mark", "\ufeff\nSome text.\n", []typeText{nti(TypeIgnore, "\ufeff"), tstSomeText, tstEOF}, nil},
 	{"No front matter", "\nSome text.\n", []typeText{tstSomeText, tstEOF}, nil},
+	{"No front matter, only whitespace", "   \n\t\n", []typeText{nti(tText, "   \n\t\n"), tstEOF}, nil},
+	{"No front matter, starts with dash dash", "-- Hello\n", []typeText{nti(tText, "-- Hello\n"), tstEOF}, nil},
+	{"No front matter, starts with plus plus", "++ Hello\n", []typeText{nti(tText, "++ Hello\n"), tstEOF}, nil},
+	{"No front matter, starts with hash but not org", "# Hello\n", []typeText{nti(tText, "# Hello\n"), tstEOF}, nil},
+	{"No front matter, unclosed JSON brace", "{ \"title\": \"test\"\nMore text.\n", []typeText{nti(tText, "{ \"title\": \"test\"\nMore text.\n"), tstEOF}, nil},
+	{"No front matter, inline JSON brace", "{foo} bar baz\n", []typeText{nti(tText, "{foo} bar baz\n"), tstEOF}, nil},
 	{"YAML front matter", "---\nfoo: \"bar\"\n---\n\nSome text.\n", []typeText{tstFrontMatterYAML, tstSomeText, tstEOF}, nil},
 	{"YAML empty front matter", "---\n---\n\nSome text.\n", []typeText{nti(TypeFrontMatterYAML, ""), tstSomeText, tstEOF}, nil},
 	// Note that we keep all bytes as they are, but we need to handle CRLF
@@ -76,6 +82,11 @@ var frontMatterTests = []lexerTest{
 	{"Summary and shortcode, no space", "+++\nfoo = \"bar\"\n+++\n\nSome text.\n<!--more-->{{< sc1 >}}\nSome text.\n", []typeText{tstFrontMatterTOML, tstSomeText, nti(TypeLeadSummaryDivider, "<!--more-->"), tstLeftNoMD, tstSC1, tstRightNoMD, tstSomeText, tstEOF}, nil},
 	// https://github.com/gohugoio/hugo/issues/5464
 	{"Summary and shortcode only", "+++\nfoo = \"bar\"\n+++\n{{< sc1 >}}\n<!--more-->\n{{< sc2 >}}", []typeText{tstFrontMatterTOML, tstLeftNoMD, tstSC1, tstRightNoMD, tstNewline, tstSummaryDivider, tstLeftNoMD, tstSC2, tstRightNoMD, tstEOF}, nil},
+	{"Multiple summary dividers", "+++\nfoo = \"bar\"\n+++\n\nPara 1.\n<!--more-->\nPara 2.\n<!--more-->\nPara 3.\n", []typeText{tstFrontMatterTOML, nti(tText, "\nPara 1.\n"), tstSummaryDivider, nti(tText, "Para 2.\n"), nti(TypeLeadSummaryDivider, "<!--more-->\n"), nti(tText, "Para 3.\n"), tstEOF}, nil},
+	{"Multiple summary dividers adjacent", "+++\nfoo = \"bar\"\n+++\n\n<!--more--><!--more-->\nText.\n", []typeText{tstFrontMatterTOML, nti(tText, "\n"), nti(TypeLeadSummaryDivider, "<!--more-->"), nti(TypeLeadSummaryDivider, "<!--more-->\n"), nti(tText, "Text.\n"), tstEOF}, nil},
+	{"Multiple summary dividers ORG", tstORG + "\nPara 1.\n# more\nPara 2.\n# more\nPara 3.\n", []typeText{tstFrontMatterORG, nti(tText, "\nPara 1.\n"), nti(TypeLeadSummaryDivider, "# more\n"), nti(tText, "Para 2.\n"), nti(TypeLeadSummaryDivider, "# more\n"), nti(tText, "Para 3.\n"), tstEOF}, nil},
+	{"ORG front matter ignores HTML divider", tstORG + "\nPara 1.\n<!--more-->\nPara 2.\n", []typeText{tstFrontMatterORG, nti(tText, "\nPara 1.\n<!--more-->\nPara 2.\n"), tstEOF}, nil},
+	{"YAML front matter ignores ORG divider", "---\nfoo: \"bar\"\n---\n\nPara 1.\n# more\nPara 2.\n", []typeText{tstFrontMatterYAML, nti(tText, "\nPara 1.\n# more\nPara 2.\n"), tstEOF}, nil},
 }
 
 func TestFrontMatter(t *testing.T) {

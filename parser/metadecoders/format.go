@@ -67,7 +67,7 @@ func FormatFromString(formatStr string) Format {
 	return ""
 }
 
-// FormatFromContentString tries to detect the format (JSON, YAML, TOML or XML)
+// FormatFromContentString tries to detect the format (JSON, YAML, TOML, XML or ORG)
 // in the given string.
 // It return an empty string if no format could be detected.
 func (d Decoder) FormatFromContentString(data string) Format {
@@ -76,6 +76,11 @@ func (d Decoder) FormatFromContentString(data string) Format {
 	yamlIdx := strings.Index(data, ":")
 	xmlIdx := strings.Index(data, "<")
 	tomlIdx := strings.Index(data, "=")
+	orgIdx := strings.Index(data, "#+")
+
+	if isLowerIndexThan(orgIdx, csvIdx, jsonIdx, yamlIdx, xmlIdx, tomlIdx) {
+		return ORG
+	}
 
 	if isLowerIndexThan(csvIdx, jsonIdx, yamlIdx, xmlIdx, tomlIdx) {
 		return CSV

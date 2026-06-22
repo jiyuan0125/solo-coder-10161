@@ -183,7 +183,7 @@ var shortCodeLexerTests = []lexerTest{
 		"escaped quotes inside nonescaped quotes",
 		`{{< sc1 param1="Hello \"escaped\" World"  >}}`,
 		[]typeText{
-			tstLeftNoMD, tstSC1, tstParam1, nti(tScParamVal, `Hello "escaped" World`), tstRightNoMD, tstEOF,
+			tstLeftNoMD, tstSC1, tstParam1, nti(tScParamVal, `Hello \"escaped\" World`), tstRightNoMD, tstEOF,
 		},
 		nil,
 	},
@@ -191,7 +191,7 @@ var shortCodeLexerTests = []lexerTest{
 		"escaped quotes inside nonescaped quotes in positional param",
 		`{{< sc1 "Hello \"escaped\" World"  >}}`,
 		[]typeText{
-			tstLeftNoMD, tstSC1, nti(tScParam, `Hello "escaped" World`), tstRightNoMD, tstEOF,
+			tstLeftNoMD, tstSC1, nti(tScParam, `Hello \"escaped\" World`), tstRightNoMD, tstEOF,
 		},
 		nil,
 	},

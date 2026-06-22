@@ -212,7 +212,7 @@ Loop:
 	}
 
 	if escapedInnerQuoteFound {
-		l.ignoreEscapesAndEmit(typ, true)
+		l.emitString(typ)
 	} else {
 		l.emitString(typ)
 	}

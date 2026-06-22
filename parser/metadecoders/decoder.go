@@ -398,18 +398,41 @@ func (d Decoder) unmarshalORG(data []byte, v any) error {
 	frontMatter := make(map[string]any, len(document.BufferSettings))
 	for k, v := range document.BufferSettings {
 		k = strings.ToLower(k)
-		if strings.HasSuffix(k, "[]") {
-			frontMatter[k[:len(k)-2]] = strings.Fields(v)
-		} else if strings.Contains(v, "\n") {
-			frontMatter[k] = strings.Split(v, "\n")
-		} else if k == "filetags" {
+		var val any
+		if k == "filetags" {
 			trimmed := strings.TrimPrefix(v, ":")
 			trimmed = strings.TrimSuffix(trimmed, ":")
-			frontMatter[k] = strings.Split(trimmed, ":")
+			val = strings.Split(trimmed, ":")
+		} else if strings.HasSuffix(k, "[]") {
+			k = k[:len(k)-2]
+			val = strings.Fields(v)
 		} else if k == "date" || k == "lastmod" || k == "publishdate" || k == "expirydate" {
-			frontMatter[k] = parseORGDate(v)
+			val = parseORGDate(v)
+		} else if strings.Contains(v, "\n") {
+			val = strings.Split(v, "\n")
 		} else {
-			frontMatter[k] = v
+			val = v
+		}
+
+		if existing, ok := frontMatter[k]; ok {
+			switch ev := existing.(type) {
+			case string:
+				switch nv := val.(type) {
+				case string:
+					frontMatter[k] = []string{ev, nv}
+				case []string:
+					frontMatter[k] = append([]string{ev}, nv...)
+				}
+			case []string:
+				switch nv := val.(type) {
+				case string:
+					frontMatter[k] = append(ev, nv)
+				case []string:
+					frontMatter[k] = append(ev, nv...)
+				}
+			}
+		} else {
+			frontMatter[k] = val
 		}
 	}
 	switch vv := v.(type) {

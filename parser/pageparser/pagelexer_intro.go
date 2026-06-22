@@ -56,7 +56,8 @@ func lexFrontMatterJSON(l *pageLexer) stateFunc {
 
 		switch {
 		case r == eof:
-			return l.errorf("unexpected EOF parsing JSON front matter")
+			l.pos = l.start
+			return lexMainSection
 		case r == '{':
 			if !inQuote {
 				level++
@@ -78,9 +79,21 @@ func lexFrontMatterJSON(l *pageLexer) stateFunc {
 		}
 	}
 
-	l.consumeCRLF()
-	l.emit(TypeFrontMatterJSON)
+	// Check if this looks like a real JSON front matter:
+	// the closing brace should be at end of line or followed by whitespace + newline.
+	// Otherwise it's likely just inline text with braces.
+	peekPos := l.pos
+	for peekPos < len(l.input) && (l.input[peekPos] == ' ' || l.input[peekPos] == '\t') {
+		peekPos++
+	}
+	if peekPos >= len(l.input) || l.input[peekPos] == '\n' || l.input[peekPos] == '\r' {
+		l.consumeCRLF()
+		l.emit(TypeFrontMatterJSON)
+		return lexMainSection
+	}
 
+	// Doesn't look like front matter, fall back to text
+	l.pos = l.start
 	return lexMainSection
 }
 
@@ -125,7 +138,7 @@ LOOP:
 func (l *pageLexer) lexFrontMatterSection(tp ItemType, delimr rune, name string, delim []byte) stateFunc {
 	for range 2 {
 		if r := l.next(); r != delimr {
-			return l.errorf("invalid %s delimiter", name)
+			return lexMainSection
 		}
 	}
 
