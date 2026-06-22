@@ -80,7 +80,7 @@ var Default = Decoder{
 // what's needed for Hugo's front matter decoding.
 func (d Decoder) UnmarshalToMap(data []byte, f Format) (map[string]any, error) {
 	m := make(map[string]any)
-	if data == nil {
+	if len(data) == 0 {
 		return m, nil
 	}
 

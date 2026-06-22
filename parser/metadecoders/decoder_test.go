@@ -111,6 +111,34 @@ func TestUnmarshalToMap(t *testing.T) {
 	}
 }
 
+func TestUnmarshalToMapEmptyInput(t *testing.T) {
+	c := qt.New(t)
+
+	d := Default
+
+	formats := []Format{YAML, JSON, TOML, ORG, XML, CSV}
+
+	t.Run("nil slice", func(t *testing.T) {
+		for _, f := range formats {
+			msg := qt.Commentf("format: %s", f)
+			m, err := d.UnmarshalToMap(nil, f)
+			c.Assert(err, qt.IsNil, msg)
+			c.Assert(m, qt.Not(qt.IsNil), msg)
+			c.Assert(len(m), qt.Equals, 0, msg)
+		}
+	})
+
+	t.Run("empty slice", func(t *testing.T) {
+		for _, f := range formats {
+			msg := qt.Commentf("format: %s", f)
+			m, err := d.UnmarshalToMap([]byte{}, f)
+			c.Assert(err, qt.IsNil, msg)
+			c.Assert(m, qt.Not(qt.IsNil), msg)
+			c.Assert(len(m), qt.Equals, 0, msg)
+		}
+	})
+}
+
 func TestUnmarshalToInterface(t *testing.T) {
 	c := qt.New(t)
 
